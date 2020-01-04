@@ -20,13 +20,13 @@ fn get_coords(input: Vec<(char, i32)>) -> Vec<(i32, i32)> {
   ).collect();
 }
 
-fn get_intersections(p1: &Vec<(i32, i32)>, p2: &Vec<(i32, i32)>) -> Vec<(i32, i32)>{
+fn get_intersections(p1: &Vec<(i32, i32)>, p2: &Vec<(i32, i32)>) -> Vec<((i32, i32), (i32, i32))>{
   let mut i = Vec::new();
-  for c in p1 {
-    for d in p2 {
+  for (l1, c) in p1.iter().enumerate() {
+    for (l2, d) in p2.iter().enumerate() {
       if (c == d){
-        println!("pushing: {:?} {:?} ({})", c, d, get_distance(*c));
-        i.push(c.clone());
+        println!("pushing: {:?} {:?} ({})", c, d, l1 + l2 + 2);
+        i.push((c.clone(), (l1 as i32, l2 as i32)));
       }
     }
   }
@@ -40,8 +40,8 @@ fn get_distance((x, y): (i32, i32)) -> i32 {
 fn get_nearest_intersection(p1: &Vec<(i32, i32)>, p2: &Vec<(i32, i32)>) -> (i32, i32) {
   let intersections = get_intersections(p1, p2);
   let mut smallest_inter = (-1, -1);
-  let mut smallest_dist = 9999;
-  for i in get_intersections(p1, p2){
+  let mut smallest_dist = 9999999;
+  for (i, (d1, d2)) in get_intersections(p1, p2){
     println!("checking: {:?}", i);
     if get_distance(i) < smallest_dist {
       smallest_inter = i;
@@ -49,6 +49,20 @@ fn get_nearest_intersection(p1: &Vec<(i32, i32)>, p2: &Vec<(i32, i32)>) -> (i32,
     };
   }
   return smallest_inter;
+}
+
+fn get_shortest_intersection(p1: &Vec<(i32, i32)>, p2: &Vec<(i32, i32)>) -> i32 {
+  let intersections = get_intersections(p1, p2);
+  let mut smallest_inter = (-1, -1);
+  let mut smallest_dist = 9999999;
+  for (i, (d1, d2)) in get_intersections(p1, p2){
+    println!("checking: {:?}", i);
+    if (d1 + d2) < smallest_dist {
+      smallest_inter = i;
+      smallest_dist = d1 + d2;
+    };
+  }
+  return smallest_dist + 2;
 }
 
 #[cfg(test)]
@@ -72,7 +86,7 @@ mod tests {
     fn test_get_intersections(){
       let p1 = vec![(0, 1), (1, 1)];
       let p2 = vec![(1, 1)];
-      assert_eq!(get_intersections(&p1, &p2), vec![(1, 1)]);
+      assert_eq!(get_intersections(&p1, &p2), vec![((1, 1), (1, 0))]);
     }
 
     #[test]
@@ -98,6 +112,17 @@ mod tests {
       let p4 = get_coords(parse_path("U98,R91,D20,R16,D67,R40,U7,R15,U6,R7"));
       assert_eq!(get_distance(get_nearest_intersection(&p3, &p4)), 135);
     }
+
+    #[test]
+    fn test_get_shortest_intersection(){
+      let p1 = get_coords(parse_path("R75,D30,R83,U83,L12,D49,R71,U7,L72"));
+      let p2 = get_coords(parse_path("U62,R66,U55,R34,D71,R55,D58,R83"));
+      assert_eq!(get_shortest_intersection(&p1, &p2), 610);
+
+      let p3 = get_coords(parse_path("R98,U47,R26,D63,R33,U87,L62,D20,R33,U53,R51"));
+      let p4 = get_coords(parse_path("U98,R91,D20,R16,D67,R40,U7,R15,U6,R7"));
+      assert_eq!(get_shortest_intersection(&p3, &p4), 410);
+    }
 }
 
 fn puzzle_1(){
@@ -112,7 +137,17 @@ fn puzzle_1(){
     println!("puzzle 1: {}", result);
 }
 
+fn puzzle_2(){
+    let p1 = fs::read_to_string("./input.txt").unwrap();
+    let p2 = fs::read_to_string("./input-2.txt").unwrap();
+    let result = get_shortest_intersection(
+        &get_coords(parse_path(&p1.trim())),
+        &get_coords(parse_path(&p2.trim()))
+    );
+    println!("puzzle 2: {}", result);
+}
+
 fn main() {
-    puzzle_1();
+    puzzle_2();
     println!("Hello, world!");
 }
