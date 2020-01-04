@@ -51,6 +51,25 @@ fn puzzle_1() {
     println!("pos0: {}", result[0]);
 }
 
+fn puzzle_2() {
+    let contents = fs::read_to_string("./input.txt").unwrap();
+    let input = parse_program(&contents.trim());
+
+    for x in 0..100 {
+      for y in 0..100 {
+        let mut _input = input.clone();
+        _input[1] = x;
+        _input[2] = y;
+        let result = execute(_input);
+        if result[0] == 19690720 {
+            println!("100 * {} + {} = {}", x, y, 100*x+y);
+            break;
+        }
+      }
+    }
+}
+
 fn main() {
     puzzle_1();
+    puzzle_2();
 }
