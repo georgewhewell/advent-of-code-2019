@@ -2,18 +2,30 @@ fn is_valid(guess: &str) -> bool {
   let gb = guess.as_bytes();
   let mut curr = gb[0];
   let mut next;
-  let mut has_repeat = false;
+
   for c in 1..6 {
-    next = gb[c].clone();
+    next = gb[c];
     if next < curr {
         return false;
     };
-    if next == curr {
-        has_repeat = true;
-    };
     curr = next;
   }
-  return has_repeat;
+
+  let mut cnt = 0;
+  curr = gb[0];
+  for c in 1..6 {
+     if gb[c] == curr {
+        cnt += 1;
+     } else {
+        if cnt == 1 {
+          return true;
+        }
+        curr = gb[c];
+        cnt = 0;
+     }
+  }
+  
+  return cnt == 1;
 }
 
 #[cfg(test)]
@@ -31,6 +43,14 @@ mod tests {
     fn test_repeat(){
         assert_eq!(is_valid("123789"), false);
     }
+
+    #[test]
+    fn test_no_larger(){
+        assert_eq!(is_valid("112233"), true);
+        assert_eq!(is_valid("123444"), false);
+        assert_eq!(is_valid("111122"), true);
+    }
+
 }
 
 fn puzzle_1(start: u32, end: u32) -> u32 {
