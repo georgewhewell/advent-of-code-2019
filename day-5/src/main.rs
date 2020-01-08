@@ -7,97 +7,133 @@ fn parse_program(input: &str) -> Vec<i32> {
         .collect::<Vec<i32>>();
 }
 
-fn _execute(mem: &mut Vec<i32>, ptr: &mut usize, input: Option<i32>) -> bool {
-    println!("ptr: {}, running: {:?}", ptr, mem);
-    if mem.get(*ptr) == None {
-        println!("pointer out of bounds- done??");
-        return false;
+enum Dir {
+ Read,
+ Write,
+ Skip,
+}
+
+fn op_arity(op: usize) -> [Dir; 3] {
+    return match op % 10 {
+        1 => [Dir::Read, Dir::Read, Dir::Write],
+        2 => [Dir::Read, Dir::Read, Dir::Write],
+        3 => [Dir::Write, Dir::Skip, Dir::Skip],
+        4 => [Dir::Read, Dir::Skip, Dir::Skip],
+        5 => [Dir::Read, Dir::Read, Dir::Skip],
+        6 => [Dir::Read, Dir::Read, Dir::Skip],
+        7 => [Dir::Read, Dir::Read, Dir::Write],
+        8 => [Dir::Read, Dir::Read, Dir::Write],
+        9 => [Dir::Skip, Dir::Skip, Dir::Skip],
+        _ => panic!("Bad opcode: {}", op),
     };
-    let op = mem[*ptr];
+}
+
+struct VMState {
+    ptr: usize,
+    input: Option<i32>,
+    output: Option<i32>,
+    regs: [i32; 3],
+}
+
+fn _fetch(state: &mut VMState, mem: &Vec<i32>) {
+    let op = mem[state.ptr] as usize;
+    state.ptr += 1;
+    let mut n = op.clone() / 10;
+    for (i, dir) in op_arity(op).iter().enumerate() {
+        n /= 10;
+        match dir {
+          Dir::Read => {
+            if n % 10 == 0 {
+                println!("position mode");
+                state.regs[i] = mem[mem[state.ptr] as usize];
+                println!("was: {}", state.regs[i]);
+            } else {
+                println!("immediate mode");
+                state.regs[i] = mem[state.ptr];
+            };
+            state.ptr += 1;
+          }
+          Dir::Write => {
+            state.regs[i] = mem[state.ptr];
+            state.ptr += 1;
+          }
+          Dir::Skip => { }
+        }
+    }
+}
+
+fn _execute(state: &mut VMState, mem: &mut Vec<i32>) -> bool {
+    println!("ptr: {}, running: {:?}", state.ptr, mem);
+    let op = mem[state.ptr] as usize;
+    _fetch(state, mem);
     match op % 10 {
         1 => {
-            let a;
-            let b;
-            match (op / 100) % 10 {
-              0 => {
-                a = mem[mem[*ptr + 1] as usize];
-              }
-              1 => {
-                a = mem[*ptr + 1];
-              }
-              _ => { panic!("bad param mode: {} (op: {}(", (op / 100) % 10, op); }
-            }
-            match (op / 1000) % 10 {
-              0 => {
-                b = mem[mem[*ptr + 2] as usize];
-              }
-              1 => {
-                b = mem[*ptr + 2];
-              }
-              _ => { panic!("bad param mode"); }
-            }
-            let c = mem[*ptr + 3];
-            mem[c as usize] = a + b;
-            *ptr += 4;
+            println!("adding: {:?}", state.regs);
+            mem[state.regs[2] as usize] = state.regs[0] + state.regs[1];
         }
         2 => {
-            let a;
-            let b;
-            match (op / 100) % 10 {
-              0 => {
-                a = mem[mem[*ptr + 1] as usize];
-              }
-              1 => {
-                a = mem[*ptr + 1];
-              }
-              _ => { panic!("bad param mode: {}", (op / 10) % 10); }
-            }
-            match (op / 1000) % 10 {
-              0 => {
-                  println!("pos mod");
-                b = mem[mem[*ptr + 2] as usize];
-              }
-              1 => {
-                  println!("im mod");
-                b = mem[*ptr + 2];
-              }
-              _ => { panic!("bad param mode"); }
-            }
-            let c = mem.get(*ptr + 3).cloned().unwrap();
-            println!("writing mult {}, {} to {}", a, b, mem[*ptr+3]);
-            mem[c as usize] = a * b;
-            *ptr += 4;
+            mem[state.regs[2] as usize] = state.regs[0] * state.regs[1];
         }
         3 => {
-            let a = mem[*ptr+1];
-            match input {
-              Some(i) => {
-                println!("storing {} at {} (should be {})", i, a, mem[*ptr+1]);
-                mem[a as usize] = i;
-              }
-              None => { panic!("No input for input instruction"); }
+            match state.input {
+                Some(i) => {
+                    // println!("storing {} at {} (should be {})", i, a, mem[*ptr+1]);
+                    mem[state.regs[0] as usize] = i;
+                }
+                None => {
+                    panic!("No input for input instruction");
+                }
             }
-            *ptr += 2;
         }
         4 => {
-            let a = mem.get(mem[*ptr + 1] as usize).cloned().unwrap();
-            println!("Outputting- {}", a);
-            *ptr += 2;
+            state.output = Some(state.regs[0]);
+            println!("Outputting- {:?}", state.output);
+        }
+        5 => {
+            if state.regs[0] != 0 {
+                println!("Jumping to {}", state.regs[1]);
+                state.ptr = state.regs[1] as usize;
+            }
+        }
+        6 => {
+            if state.regs[0] == 0 {
+                println!("Is Zero, jump to {}", state.regs[1]);
+                state.ptr = state.regs[1] as usize;
+            }
+        }
+        7 => {
+            if state.regs[0] < state.regs[1] {
+                mem[state.regs[2] as usize] == 1;
+            } else {
+                mem[state.regs[2] as usize] == 0;
+            }
+        }
+        8 => {
+            if state.regs[0] == state.regs[1] {
+                mem[state.regs[2] as usize] == 1;
+            } else {
+                mem[state.regs[2] as usize] == 0;
+            }
         }
         9 => {
             return false;
         }
         _ => {
-            panic!("unmatched op: {}- {}", op, op % 10);
+            panic!("unmatched op: {}", op);
         }
     };
     return true;
 }
 
-fn execute(mem: &mut Vec<i32>, input: Option<i32>) -> &[i32] {
-    let mut ptr = 0;
-    while _execute(mem, &mut ptr, input) {}
-    return mem;
+fn execute(mem: &mut Vec<i32>, input: Option<i32>) -> (Option<i32>, &[i32]) {
+    let mut state = VMState {
+        ptr: 0,
+        input: input,
+        output: None,
+        regs: [0, 0, 0],
+    };
+    while _execute(&mut state, mem) {}
+    return (state.output, mem);
 }
 
 #[cfg(test)]
@@ -107,6 +143,141 @@ mod tests {
     #[test]
     fn test_parse() {
         assert_eq!(parse_program("1,2,3"), [1, 2, 3]);
+    }
+
+    #[test]
+    fn test_simple_jmp_execute_im() {
+        let mut input = vec![1105, 1, 4, 0, 99];
+        let (mut output, _) = execute(&mut input, Some(8));
+        assert_eq!(output, None);
+    }
+
+    #[test]
+    fn test_simple_jmp_execute_pos() {
+        let mut input = vec![5, 1, 3, 4, 99];
+        let (mut output, _) = execute(&mut input, Some(8));
+        assert_eq!(output, None);
+    }
+
+    #[test]
+    fn test_simple_jmp_false_execute_im() {
+        let mut input = vec![1106, 0, 4, 0, 99];
+        let (mut output, _) = execute(&mut input, Some(8));
+        assert_eq!(output, None);
+    }
+
+    #[test]
+    fn test_simple_jmp_false_execute_pos() {
+        let mut input = vec![6, 0, 5, 99, 1, 99, 3, 4, 99];
+        let (mut output, _) = execute(&mut input, Some(8));
+        assert_eq!(output, None);
+    }
+
+    #[test]
+    fn test_simple_jmp_lt_execute_im() {
+        let mut input = vec![11106, 0, 4, 0, 99];
+        let (mut output, _) = execute(&mut input, Some(8));
+        assert_eq!(output, None);
+    }
+
+    #[test]
+    fn test_simple_jmp_lt_execute_pos() {
+        let mut input = vec![7, 0, 3, 4, 99];
+        let (mut output, _) = execute(&mut input, Some(8));
+        assert_eq!(output, None);
+    }
+
+    #[test]
+    fn test_simple_jmp_eq_execute_im() {
+        let mut input = vec![8, 1, 1, 5, 104, 0, 99];
+        let (mut output, _) = execute(&mut input, Some(8));
+        assert_eq!(output, Some(5));
+    }
+
+    #[test]
+    fn test_simple_jmp_eq_execute_pos() {
+        let mut input = vec![11108, 2, 3, 3, 99];
+        let (mut output, _) = execute(&mut input, Some(8));
+        assert_eq!(output, None);
+    }
+
+    #[test]
+    fn test_jmp_execute() {
+        let mut input = vec![3,9,8,9,10,9,4,9,99,-1,8];
+        let (mut output, _) = execute(&mut input, Some(8));
+        assert_eq!(output, Some(1));
+        input = vec![3,9,8,9,10,9,4,9,99,-1,8];
+        let (mut output, _) = execute(&mut input, Some(9));
+        assert_eq!(output, Some(0));
+    }
+
+    #[test]
+    fn test_jmp_execute_2() {
+        let mut input = vec![3,9,7,9,10,9,4,9,99,-1,8];
+        let (output, _) = execute(&mut input, Some(5));
+        assert_eq!(output, Some(1));
+        input = vec![3,9,7,9,10,9,4,9,99,-1,8];
+        let (output, _) = execute(&mut input, Some(9));
+        assert_eq!(output, Some(0));
+    }
+
+    #[test]
+    fn test_jmp_execute_3() {
+        let mut input = vec![3,3,1108,-1,8,3,4,3,99];
+        let (output, _) = execute(&mut input, Some(8));
+        assert_eq!(output, Some(1));
+        input = vec![3,3,1108,-1,8,3,4,3,99];
+        let (output, _) = execute(&mut input, Some(9));
+        assert_eq!(output, Some(0));
+    }
+
+    #[test]
+    fn test_jmp_execute_4() {
+        let mut input = vec![3,3,1107,-1,8,3,4,3,99];
+        let (output, _) = execute(&mut input, Some(5));
+        assert_eq!(output, Some(1));
+        input = vec![3,3,1108,-1,8,3,4,3,99];
+        let (output, _) = execute(&mut input, Some(9));
+        assert_eq!(output, Some(0));
+    }
+
+    #[test]
+    fn test_jmp_execute_5() {
+        let mut input = vec![3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9];
+        let (output, _) = execute(&mut input, Some(0));
+        assert_eq!(output, Some(0));
+        input = vec![3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9];
+        let (output, _) = execute(&mut input, Some(9));
+        assert_eq!(output, Some(1));
+    }
+
+    #[test]
+    fn test_jmp_execute_6() {
+        let mut input = vec![3,3,1105,-1,9,1101,0,0,12,4,12,99,1];
+        let (output, _) = execute(&mut input, Some(0));
+        assert_eq!(output, Some(0));
+        input = vec![3,3,1105,-1,9,1101,0,0,12,4,12,99,1];
+        let (output, _) = execute(&mut input, Some(9));
+        assert_eq!(output, Some(1));
+    }
+
+    #[test]
+    fn test_jmp_execute_7() {
+        let mut input = vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+        1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+        999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99];
+        let (output, _) = execute(&mut input, Some(1));
+        assert_eq!(output, Some(999));
+        input = vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+        1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+        999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99];
+        let (output, _) = execute(&mut input, Some(8));
+        assert_eq!(output, Some(1000));
+        input = vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+        1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+        999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99];
+        let (output, _) = execute(&mut input, Some(9));
+        assert_eq!(output, Some(1001));
     }
 
     #[test]
@@ -127,15 +298,15 @@ mod tests {
         execute(&mut input, None);
         assert_eq!(input, [30, 1, 1, 4, 2, 5, 6, 0, 99]);
 
-        input = vec![1002,4,3,4,33];
+        input = vec![1002, 4, 3, 4, 33];
         execute(&mut input, None);
         assert_eq!(input, [1002, 4, 3, 4, 99]);
 
         input = vec![1102, 99, 1, 4, 0];
         execute(&mut input, None);
         assert_eq!(input, [1102, 99, 1, 4, 99]);
-        
-        input = vec![1101,100,-1,4,0];
+
+        input = vec![1101, 100, -1, 4, 0];
         execute(&mut input, None);
         assert_eq!(input, [1101, 100, -1, 4, 99]);
 
@@ -148,7 +319,7 @@ mod tests {
         assert_eq!(input, [3, 2, 99]);
 
         input = vec![4, 0, 99];
-        execute(&mut input, Some(99));
+        let output = execute(&mut input, Some(99));
         assert_eq!(input, [4, 0, 99]);
     }
 }
@@ -156,33 +327,10 @@ mod tests {
 fn puzzle_1() {
     let contents = fs::read_to_string("./input.txt").unwrap();
     let mut input = parse_program(&contents.trim());
-
-    // input[1] = 12;
-    // input[2] = 2;
-
-    let result = execute(&mut input, Some(1));
-    println!("pos0: {}", result[0]);
-}
-
-fn puzzle_2() {
-    let contents = fs::read_to_string("./input.txt").unwrap();
-    let input = parse_program(&contents.trim());
-
-    for x in 0..100 {
-        for y in 0..100 {
-            let mut _input = input.clone();
-            _input[1] = x;
-            _input[2] = y;
-            execute(&mut _input, None);
-            if _input[0] == 19690720 {
-                println!("100 * {} + {} = {}", x, y, 100 * x + y);
-                return;
-            }
-        }
-    }
+    let (output, mem) = execute(&mut input, Some(5));
 }
 
 fn main() {
     puzzle_1();
- //   puzzle_2();
+    //   puzzle_2();
 }
